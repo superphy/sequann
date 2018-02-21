@@ -44,7 +44,19 @@ class AnnotDB(object):
         db = client['sequann']
         self.collection = db['amr']
 
-        self.collection.createIndex( { user: 1, title: 1, Bank: 1 }, {unique:true} )
+        # Create unique index
+        index1 = pm.IndexModel([("type", pm.DESCENDING), ("genome", pm.DESCENDING), ("contig", pm.DESCENDING),
+            ("subject", pm.DESCENDING), ("qstart", pm.DESCENDING), ("qend", pm.DESCENDING)], 
+            name="sa_unique_i1", unique=True)
+
+        if not "sa_unique_i1" in self.collection.index_information():
+            self.collection.create_indexes([index1])
+
+        if logger:
+            self.logger = logger
+        else:
+            self.logger = logging.getLogger('sequann.src.annot.AnnotDB')
+
 
 
     def size(self):
@@ -62,6 +74,27 @@ class AnnotDB(object):
                 return 0
 
         return 1
+
+
+    def load(self, docdicts):
+        """Insert list of documents into mongodb
+
+        Args:
+            docdicts(list): List of dictionaries
+           
+        """
+
+        for d in docdicts:
+            if not self._valid_document(d):
+                raise ValueError("Invalid format: {}".format(d))
+
+        try:
+            result = self.collection.insert_many(docdicts)
+            return(result.inserted_ids)
+        except pm.errors.BulkWriteError as e:
+            self.logger.warn("WriteError: {}".format(e.details))
+        
+        return(None)
 
 
 def parse_header(header_str):

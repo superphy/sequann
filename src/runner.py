@@ -12,25 +12,21 @@ __maintainer__ = "Matthew Whiteside"
 __email__ = "matthew.whiteside@phac-aspc.gc.ca"
 
 
-import argparse
 import logging
 import subprocess
 from Bio import SeqIO
 
 
-config = {
-    'resfams_hmm_models': '/home/matt/workspace/l_amr/pangenome/annotate/resfams/Resfams.hmm',
-    'resfinder_blastdb': '/home/matt/workspace/l_amr/pangenome/annotate/resfinder/resfinder'
-}
 logger = None
 
 
-def run_resfinder(options):
+def run_resfinder():
     """Run Blast with resfinder sequence DB
 
     """
-    cmd = ['blastn','-query', options.input,
-        '-db', config['resfinder_blastdb'], '-out', options.output,
+
+    cmd = ['blastn','-query', str(snakemake.input),
+        '-db', str(snakemake.params.blastdb), '-out', str(snakemake.output),
         '-evalue', '0.0001', '-outfmt', 
         "7 qseqid sseqid pident length qstart qend qlen sstart send slen evalue bitscore",
         '-perc_identity', '90']
@@ -39,25 +35,25 @@ def run_resfinder(options):
     subprocess.check_output(cmd)
 
 
-def run_rgi(options):
-    """Run RGI
+# def run_rgi(options):
+#     """Run RGI
 
-    """
-    subprocess.check_output(['rgi', '-i', options.input, '-o', options.output])
+#     """
+#     subprocess.check_output(['rgi', '-i', options.input, '-o', options.output])
 
 
-def run_resfams(options):
-    """Run HMMer on translated sequences
+# def run_resfams(options):
+#     """Run HMMer on translated sequences
 
-    """
+#     """
 
-    # Translate
-    translation_file = append_it(options.input, 'translated')
-    translate_orfs(options.input, translation_file)
+#     # Translate
+#     translation_file = append_it(options.input, 'translated')
+#     translate_orfs(options.input, translation_file)
 
-    # Run HMMer
-    subprocess.check_output(['hmmsearch', '--cpu', '8', '-E', '0.001', '--tblout', options.output, config['resfams_hmm_models'],
-        translation_file])
+#     # Run HMMer
+#     subprocess.check_output(['hmmsearch', '--cpu', '8', '-E', '0.001', '--tblout', options.output, config['resfams_hmm_models'],
+#         translation_file])
 
 
 def append_it(filename, id):
@@ -109,25 +105,17 @@ if __name__ == "__main__":
     """
 
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('annotate.annot')
+    logger = logging.getLogger('sequann.src.runner')
 
-    # Parse command-line args
-    parser = argparse.ArgumentParser()
-    parser.add_argument('program', choices=['rgi','resfams', 'resfinder'],
-        help='Annotation program')
-    parser.add_argument('input', help='Panseq panGenome.fasta file')
-    parser.add_argument('output', help='Output file')
-    
-    options = parser.parse_args()
+   
+    # if snakemake.params.analysis == 'rgi':
+    #     run_rgi()
 
-    if options.program == 'rgi':
-        run_rgi(options)
+    # elif snakemake.params.analysis == 'resfams':
+    #     run_resfams()
 
-    elif options.program == 'resfams':
-        run_resfams(options)
-
-    elif options.program == 'resfinder':
-        run_resfinder(options)
+    if snakemake.params.analysis == 'resfinder':
+        run_resfinder()
 
 
 

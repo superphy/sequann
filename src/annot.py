@@ -67,7 +67,7 @@ class AnnotDB(object):
     def _valid_document(self, docdict):
        # Check document contains required keywords
 
-        for k in ('type', 'contig', 'genome', 'subject', 'qstart', 'qend', 'length', 
+        for k in ('type', 'contig', 'genome', 'subject', 'length', 'qstart', 'qend', 
             'qlen', 'sstart', 'send', 'slen'):
 
             if k not in docdict:
@@ -122,7 +122,7 @@ def blast_to_json(blast_hit_dict, doctype='blast'):
         'type': doctype,
         'contig': contig,
         'genome': genome,
-        'subject': blast_hit_dict['sseqid'], 
+        'subject': blast_hit_dict['sseqid'],
     }
 
     # Add the following BLAST-specific keywords+data
@@ -134,6 +134,34 @@ def blast_to_json(blast_hit_dict, doctype='blast'):
 
     return document
 
+
+def staramr_resfinder_to_json(hit_dict):
+    """Convert resfinder hit to MongoDB document
+
+    Args:
+        hit_dict(dict): A dictionary with the following keys:
+            ('isolate', 'gene', 'pident', 'poverlap', 'len_frac', 'start', 'end', 'contig', 'accession')   
+       
+    """
+
+    length, slen = [int(s) for s in hit_dict['len_frac'.split('/')]]
+
+    document = {
+        'type': 'resfinder',
+        'contig': hit_dict['contig'],
+        'genome': hit_dict['genome'],
+        'subject': "{}|{}".format(hit_dict['gene'],hit_dict['accession']),
+        'qstart': int(hit_dict['start']),
+        'qend': int(hit_dict['start']),
+        'pident': float(hit_dict['pident']),
+        'length': length,
+        'slen': slen,
+        'sstart': None,
+        'send': None,
+        'overlap': float(hit_dict['poverlap'])
+    }
+
+    return document
 
 if __name__ == "__main__":
     """Database status

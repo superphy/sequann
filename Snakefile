@@ -25,6 +25,7 @@ dotenv.load_dotenv(dotenv_path)
 
 FASTADIR=os.environ.get('SQANFASTADIR')
 DATADIR=os.environ.get('SQANDATA')
+DBDIR=os.environ.get('DBDIR')
 
 
 #################################################################################
@@ -33,23 +34,65 @@ DATADIR=os.environ.get('SQANDATA')
 
 GENOMES, = glob_wildcards(FASTADIR + "/{genome}.fasta")
 
-rule load_resfinder:
-    input:  expand(DATADIR + "annotations/resfinder/{genome}_resfinder.txt", genome=GENOMES)
-    params:
-        inputdir=DATADIR + "annotations/resfinder/",
-        analysis="resfinder"
-    script:
-        "src/loader.py"
+rule all:
+    input: DBDIR
 
 
-rule run_resfinder:
+
+
+# rule load_resfinder:
+#     input:  expand(DATADIR + "annotations/resfinder/{genome}_resfinder.txt", genome=GENOMES)
+#     params:
+#         inputdir=DATADIR + "annotations/resfinder/",
+#         analysis="resfinder"
+#     script:
+#         "src/loader.py"
+
+
+# rule run_resfinder:
+#     input:
+#         FASTADIR + "{genome}.fasta",
+#     output: DATADIR + "annotations/resfinder/{genome}_resfinder.txt"
+#     params:
+#         blastdb=os.environ.get('RESFINDERBLASTDB'),
+#         analysis="resfinder"
+#     threads:
+#         8
+#     script:
+#         "src/runner.py"
+
+
+rule staramr:
     input:
-        FASTADIR + "{genome}.fasta",
-    output: DATADIR + "annotations/resfinder/{genome}_resfinder.txt"
+        GENOMES
+    output: 
+        DATADIR + "annotations/staramr/pointfinder.tsv",
+        DATADIR + "annotations/staramr/resfinder.tsv"
+    shell:
+        "staramr search -o staramr --pointfinder-organism salmonella input"
+
+
+rule load_resfinder:
+    input:
+        FASTADIR + "{genome}.fasta"
+    output: 
+        DATADIR + "annotations/staramr/resfinder.tsv"
     params:
-        blastdb=os.environ.get('RESFINDERBLASTDB'),
         analysis="resfinder"
-    threads:
-        8
     script:
         "src/runner.py"
+
+
+rule load_pointfinder:
+    input:
+        FASTADIR + "{genome}.fasta"
+    output: 
+        DATADIR + "annotations/staramr/pointfinder.tsv"
+    params:
+        analysis="pointfinder"
+    script:
+        "src/runner.py"
+
+
+
+

@@ -136,6 +136,64 @@ def load_resfinder():
         db.load(insert_rows)
 
 
+def load_staramr_resfinder():
+    """Load Resfinder annotations into DB as output by staramr
+
+    """
+
+    f = snakemake.input[0]
+
+    dburi = os.environ.get('DBURI')
+    db = AnnotDB(dburi)
+
+    insert_rows=[]
+
+    df = pandas.read_table(f, header=True, 
+            names=('isolate', 'gene', 'pident', 'poverlap', 'len_frac', 'contig', 'start', 'end', 'accession'))
+
+    # Iterate over each blast hit in file
+    loci = {}
+    for idx, row in df.iterrows():
+        name = row['isolate']
+        start = int(row['start'])
+        stop = int(row['end'])
+        pident = float(row['pident'])
+        acc = row['accession']
+        poverlap = row['poverlap']
+
+        if poverlap >= 60:
+            # over 60% of gene must align with query
+            
+            # Keep best hit for each position
+            addr = locad(name, start, stop)
+            if addr in loci:
+                thisi = float(loci[addr]['pident'])
+                if thisi < pident:
+                    loci[addr] = row
+                elif thisi == pident and loci[addr]['accession'] > acc:
+                    loci[addr] = row
+            else:
+                loci[addr] = row
+
+    # Remove overlapping hits, keeping longest
+    locations = defaultdict(list)
+    for row in loci.values():
+        query = row['isolate']
+        locations[query].append(sorted((row['start'], row['end'])))
+
+    hits = non_overlapping(locations)
+
+    for key in hits:
+        row = loci[key]
+
+        docdict = staramr_to_json(row, doctype='resfinder')
+        insert_rows.append(docdict)
+
+    if insert_rows:        
+        db.load(insert_rows)
+
+
+
 def locad(contig, start, stop):
     # Loci address
     s = sorted([start, stop])
@@ -227,7 +285,7 @@ if __name__ == "__main__":
     #     run_resfams()
 
     if snakemake.params.analysis == 'resfinder':
-        load_resfinder()
+        load_staramr_resfinder()
 
 
 

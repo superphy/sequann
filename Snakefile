@@ -1,6 +1,7 @@
 
 import os
 import dotenv
+import glob
 
 
 #################################################################################
@@ -32,66 +33,50 @@ DBDIR=os.environ.get('DBDIR')
 # RULES                                                                         #
 #################################################################################
 
-GENOMES, = glob_wildcards(FASTADIR + "/{genome}.fasta")
+#FASTAFILES = glob.glob(FASTADIR + '/*.fasta')
 
 rule all:
-    input: DBDIR
-
-
-
-
-# rule load_resfinder:
-#     input:  expand(DATADIR + "annotations/resfinder/{genome}_resfinder.txt", genome=GENOMES)
-#     params:
-#         inputdir=DATADIR + "annotations/resfinder/",
-#         analysis="resfinder"
-#     script:
-#         "src/loader.py"
-
-
-# rule run_resfinder:
-#     input:
-#         FASTADIR + "{genome}.fasta",
-#     output: DATADIR + "annotations/resfinder/{genome}_resfinder.txt"
-#     params:
-#         blastdb=os.environ.get('RESFINDERBLASTDB'),
-#         analysis="resfinder"
-#     threads:
-#         8
-#     script:
-#         "src/runner.py"
+    input: 
+        #DATADIR + "staramr/load_pointfinder.SUCCESS",
+        DATADIR + "staramr/load_resfinder.SUCCESS"
 
 
 rule staramr:
-    input:
-        GENOMES
     output: 
-        DATADIR + "annotations/staramr/pointfinder.tsv",
-        DATADIR + "annotations/staramr/resfinder.tsv"
+        DATADIR + "staramr/pointfinder.tsv",
+        DATADIR + "staramr/resfinder.tsv"
+    params:
+        outdir=DATADIR + "staramr/",
+        fastaglob='*.fasta',
+        fastadir=FASTADIR
     shell:
-        "staramr search -o staramr --pointfinder-organism salmonella input"
-
+        """
+        cd {params.fastadir}
+        rm -rf {params.outdir}
+        staramr search -o {params.outdir} --pointfinder-organism salmonella {params.fastaglob}
+        """
+        
 
 rule load_resfinder:
     input:
-        FASTADIR + "{genome}.fasta"
+        DATADIR + "staramr/resfinder.tsv"
     output: 
-        DATADIR + "annotations/staramr/resfinder.tsv"
+        DATADIR + "staramr/load_resfinder.SUCCESS"
     params:
         analysis="resfinder"
     script:
-        "src/runner.py"
+        "src/loader.py"
 
 
-rule load_pointfinder:
-    input:
-        FASTADIR + "{genome}.fasta"
-    output: 
-        DATADIR + "annotations/staramr/pointfinder.tsv"
-    params:
-        analysis="pointfinder"
-    script:
-        "src/runner.py"
+# rule load_pointfinder:
+#     input:
+#         DATADIR + "staramr/pointfinder.tsv"
+#     output: 
+#         DATADIR + "staramr/load_pointfinder.SUCCESS"
+#     params:
+#         analysis="pointfinder"
+#     script:
+#         "src/loader.py"
 
 
 

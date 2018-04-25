@@ -19,7 +19,7 @@ import pandas
 import os
 from collections import defaultdict
 
-from annot import AnnotDB, blast_to_json
+from annot import AnnotDB, staramr_resfinder_to_json, blast_to_json, staramr_pointfinder_to_json
 
 logger = None
 
@@ -142,6 +142,7 @@ def load_staramr_resfinder():
     """
 
     f = snakemake.input[0]
+    outf = snakemake.output[0]
 
     dburi = os.environ.get('DBURI')
     db = AnnotDB(dburi)
@@ -186,18 +187,86 @@ def load_staramr_resfinder():
     for key in hits:
         row = loci[key]
 
-        docdict = staramr_to_json(row, doctype='resfinder')
+        docdict = staramr_resfinder_to_json(row, doctype='resfinder')
         insert_rows.append(docdict)
 
     if insert_rows:        
         db.load(insert_rows)
 
+    # Output file marker for snakemake
+    db.set_complete_file_flag(outf)
 
 
-def locad(contig, start, stop):
+def load_staramr_pointfinder():
+    """Load Pointfinder annotations into DB as output by staramr
+
+    """
+
+    f = snakemake.input[0]
+    outf = snakemake.output[0]
+
+    dburi = os.environ.get('DBURI')
+    db = AnnotDB(dburi)
+
+    insert_rows=[]
+
+    df = pandas.read_table(f, header=True, 
+            names=('isolate', 'gene', 'type', 'position', 'mutation', 'pident', 'poverlap', 'len_frac', 
+                'contig', 'start', 'end'))
+
+    # Iterate over each blast hit in file
+    loci = {}
+    for idx, row in df.iterrows():
+        name = row['isolate']
+        start = int(row['start'])
+        stop = int(row['end'])
+        mutpos = int(row['position'])
+        pident = float(row['pident'])
+        acc = row['accession']
+        poverlap = row['poverlap']
+
+        if poverlap >= 60:
+            # over 60% of gene must align with query
+            
+            # Keep best hit for each position
+            addr = locad(name, start, stop, mutpos)
+            if addr in loci:
+                thisi = float(loci[addr]['pident'])
+                if thisi < pident:
+                    loci[addr] = row
+                elif thisi == pident and loci[addr]['accession'] > acc:
+                    loci[addr] = row
+            else:
+                loci[addr] = row
+
+    # Remove overlapping hits, keeping longest
+    locations = defaultdict(list)
+    for row in loci.values():
+        query = row['isolate']
+        locations[query].append(sorted((row['start'], row['end'])))
+
+    hits = non_overlapping(locations)
+
+    for key in hits:
+        row = loci[key]
+
+        docdict = staramr_pointfinder_to_json(row, doctype='pointfinder')
+        insert_rows.append(docdict)
+
+    if insert_rows:        
+        db.load(insert_rows)
+
+    # Output file marker for snakemake
+    db.set_complete_file_flag(outf)
+
+
+def locad(contig, start, stop, pointmutation=None):
     # Loci address
     s = sorted([start, stop])
-    return '{}:{}-{}'.format(contig, *s)
+    if pointmutation:
+        return '{}__{}:{}-{}'.format(contig, pointmutation, *s)
+    else:
+        return '{}:{}-{}'.format(contig, *s)
 
 
 def non_overlapping(locations):
@@ -286,6 +355,9 @@ if __name__ == "__main__":
 
     if snakemake.params.analysis == 'resfinder':
         load_staramr_resfinder()
+
+    elif snakemake.params.analysis == 'pointfinder':
+        load_staramr_pointfinder()
 
 
 

@@ -20,6 +20,7 @@ import pymongo as pm
 import re
 
 from dotenv import find_dotenv, load_dotenv
+from pathlib import Path
 
 logger = None
 
@@ -97,6 +98,21 @@ class AnnotDB(object):
         return(None)
 
 
+    def set_complete_file_flag(self, fname):
+        """Creates empty file if none exists ala 'touch' command
+
+        File is used in snakemake to mark the successful loading of the results
+
+        Args:
+            fname: file
+
+        Returns:
+            none
+
+        """
+        Path(fname).touch()
+
+
 def parse_header(header_str):
 
     m = re.search(r'^(?P<genome>SRR\d+)\.fasta\|(?P<contig>.+)$', str(header_str))
@@ -162,6 +178,39 @@ def staramr_resfinder_to_json(hit_dict):
     }
 
     return document
+
+
+def staramr_pointfinder_to_json(hit_dict):
+    """Convert resfinder hit to MongoDB document
+
+    Args:
+        hit_dict(dict): A dictionary with the following keys:
+            ('isolate', 'gene', 'pident', 'poverlap', 'len_frac', 'start', 'end', 'contig', 'accession')   
+       
+    """
+
+    length, slen = [int(s) for s in hit_dict['len_frac'.split('/')]]
+
+    document = {
+        'type': 'pointfinder',
+        'contig': hit_dict['contig'],
+        'genome': hit_dict['genome'],
+        'subject': hit_dict['gene'],
+        'qstart': int(hit_dict['start']),
+        'qend': int(hit_dict['start']),
+        'pident': float(hit_dict['pident']),
+        'length': length,
+        'slen': slen,
+        'sstart': None,
+        'send': None,
+        'overlap': float(hit_dict['poverlap']),
+        'position': int(hit_dict['position']),
+        'mutation_target': hit_dict['type'],
+        'mutation': hit_dict['mutation']
+    }
+
+    return document
+
 
 if __name__ == "__main__":
     """Database status
